@@ -1,5 +1,5 @@
 // Eduardo Didier Aguilar Alvarez - A00841850
-// Damaris
+// Damaris Paola Castrellón Carrillo - A01234497
 
 #include <iostream>
 #include <stdio.h>
@@ -9,6 +9,7 @@
 #include <map>
 #include <fstream>
 #include <string.h>
+#include <iomanip>
 using namespace std;
 
 struct Order{
@@ -20,7 +21,47 @@ struct Order{
 	string restaurant;
 	string dish;
 	int price;
+    long long sortKey; 
 };
+
+
+//Do a counting sort on the digit we are sorting
+void countingSort(vector<Order> &orders, int exp) {
+    int n = orders.size();
+    vector<Order> output(n);
+    int count[10] = {0};
+
+	//Extract digit from the exp position
+    for (int i = 0; i < n; i++)
+        count[(orders[i].sortKey / exp) % 10]++;
+
+	//Prefix sum 
+    for (int i = 1; i < 10; i++)
+        count[i] += count[i - 1];
+
+	//Put each element in the output array going from right to left 
+    for (int i = n - 1; i >= 0; i--) {
+        output[count[(orders[i].sortKey / exp) % 10] - 1] = orders[i];
+        count[(orders[i].sortKey / exp) % 10]--;
+    }
+
+	//Copy result in orders[]
+    for (int i = 0; i < n; i++)
+        orders[i] = output[i];
+}
+//Complexity: o(n)
+void radixSort(vector<Order> &orders) {
+	//	To know how many digits does the largest have 
+    long long maxVal = 0;
+    for (auto &o : orders)
+        if (o.sortKey > maxVal){
+			maxVal = o.sortKey;	
+		} 
+
+	//Changes the digit we are analyzing 
+    for (long long exp = 1; maxVal / exp > 0; exp *= 10)
+        countingSort(orders, exp);
+}
 
 //This functions returns a key from a vector<Order>, if not founded it returns the element that is the first
 //greater or lesser than the key element that is in the array, depending on the greater argument.  
@@ -55,14 +96,15 @@ int  find_first_kth(const vector<Order>& orders, pair<int, int> date, bool great
 }
 
 int main(int argc, char* argv[]){
-	char line[1000];
 	string sline;
-	int index;
 
 	ifstream inFile("orders.txt"); 	
 	ofstream outFile("output.txt");	
 	
 	vector<Order> orders;
+
+
+	//Convert the month string into numbers
     map<string, int> month_to_int = {
         {"ene", 1}, {"Feb", 2}, {"Mar", 3}, {"Abr", 4}, 
         {"May", 5}, {"Jun", 6}, {"Jul", 7}, {"Ago", 8}, 
@@ -72,11 +114,10 @@ int main(int argc, char* argv[]){
 	//	Verify that the files have opened correctly
 	if (inFile.is_open() && outFile.is_open() ){	
 
-		while ( getline(inFile, sline) ){
-			outFile << sline << endl;
-
+		while ( getline(inFile, sline) ){			
+			//Declare variables to hold data from current line
 			string month_str, time_str, restaurant, dish;
-			int day, hour, minute, second, price;
+            int day, hour, minute, second, price;			
 
 			istringstream iss(sline);
 			iss >> month_str >> day >> time_str;
@@ -100,24 +141,62 @@ int main(int argc, char* argv[]){
 			price = stoi(sline.substr(paren_pos + 1, paren_end - paren_pos - 1));
 
 			Order o;
-			o.month = month_to_int[month_str];
+            o.month = month_to_int[month_str];
 			o.day = day;
-			o.hour = hour;
-			o.minute = minute;
-			o.second = second;
-			o.restaurant = restaurant;
-			o.dish = dish;
-			o.price = price;
+            o.hour = hour;
+            o.minute = minute;
+            o.second = second;
+            o.restaurant = restaurant;
+            o.dish = dish;
+            o.price = price;
+
+			//Create a single string with the date and time ofthe form MMDDHHMMSS
+	        stringstream key;
+    	    key << setfill('0') << setw(2) << month_to_int[month_str]
+        	    << setw(2) << day
+            	<< setw(2) << hour
+	            << setw(2) << minute
+    	        << setw(2) << second;
+
+			//Convert into a long long integer and store in sortKey
+        	o.sortKey = stoll(key.str());			
 
 			orders.push_back(o);
 		}
+		
 	} 
+
 	inFile.close();
-	outFile.close();
+
+	radixSort(orders);
 
 	
+    cout << "First 10 lines after being sorted: \n";
+    for (size_t i = 0; i < orders.size() && i < 10; i++) {
+        auto &o = orders[i];
+        cout << o.month << " " << o.day << " "
+             << setw(2) << setfill('0') << o.hour   << ":"
+             << setw(2) << setfill('0') << o.minute << ":"
+             << setw(2) << setfill('0') << o.second
+             << "R:"     << o.restaurant << "O:" << o.dish
+             << "("     << o.price   << ")"   << endl;
+    }
 	
-	// Sorting stuff
+
+	ofstream outFileStream("output.txt");
+	for (int j = 0; j <= orders.size(); j++) {
+		const Order& o = orders[j];
+		outFileStream << o.month << " " << o.day << " ";
+		outFileStream << (o.hour < 10 ? "0" : "") << o.hour << ":"
+					  << (o.minute < 10 ? "0" : "") << o.minute << ":"
+					  << (o.second < 10 ? "0" : "") << o.second << " ";
+		outFileStream << "R:" << o.restaurant << " O:" << o.dish << "(" << o.price << ")" << endl;
+	}
+
+	outFileStream.close();
+
+	outFile.close();
+
 	//Search of orders between two dates
 	pair<int, int> date1;
 	pair<int, int> date2;
